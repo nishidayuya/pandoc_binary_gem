@@ -1,5 +1,6 @@
+# -*- mode: ruby -*-
 # frozen_string_literal: true
 
 module PandocBinary
-  VERSION = "0.1.0"
+  VERSION = "2.10"
 end
