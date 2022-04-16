@@ -1,0 +1,5 @@
+#!/usr/bin/env ruby
+
+require "pandoc_binary"
+
+Process.exec(PandocBinary.executable_path.to_s, *ARGV)

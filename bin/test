@@ -1,0 +1,24 @@
+#!/bin/sh
+
+usage="usage: $0 version"
+
+set -eu
+
+version="${1:-}"
+if test -z "$version"
+then
+  echo "$usage"
+  exit 1
+fi
+
+set -x
+
+cd "$(dirname $0)/.."
+test -z "$(git status --short)"
+bundle
+bundle exec rake clobber
+bundle exec ./bin/update_pandoc_binary $version
+bundle exec ./exe/pandoc --version
+test "$version" = "$(bundle exec ./exe/pandoc --version | sed -n -e '1 {s/.* //; p}')"
+test -z "$(git status --short)"
+echo 'succeed!'

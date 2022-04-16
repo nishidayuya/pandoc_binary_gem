@@ -3,6 +3,10 @@
 /_yardoc/
 /coverage/
 /doc/
+/libexec/pandoc-linux-amd64
+/libexec/pandoc-linux-arm64
+/libexec/pandoc-macOS
+/libexec/pandoc-windows-x86_64
 /pkg/
 /spec/reports/
 /tmp/

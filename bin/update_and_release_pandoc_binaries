@@ -1,0 +1,33 @@
+#!/usr/bin/env ruby
+
+require "time"
+
+require "pandoc_binary"
+
+def run(*args, **kwargs)
+  puts("run command: args=#{args.inspect} kwargs=#{kwargs.inspect}")
+  system(*args, **{exception: true}.merge) if ENV["PANDOC_BINARY_DRYRUN"].to_s.empty?
+end
+
+Dir.chdir(PandocBinary::TOP_PATH)
+
+uri = URI("https://api.github.com/repos/jgm/pandoc/releases")
+json = Net::HTTP.get(uri)
+raw_releases = JSON.parse(json, symbolize_names: true)
+releases = raw_releases.map { |raw_release|
+  PandocBinary::Release.from_raw_data(raw_release)
+}
+sorted_releases = releases.sort_by { |release|
+  Gem::Version.create(release.tag_name)
+}
+
+sorted_releases.each do |release|
+  d = release.published_at_time.to_date.next_day
+  commit_time = Time.new(d.year, d.month, d.day,
+                         23, rand(0 .. 59), rand(0 .. 59), in: "+09:00").utc
+  run(*%w[git cococo ./bin/update_pandoc_binary], release.tag_name)
+  run("faketime", commit_time.iso8601,
+      *%w[git commit --amend -C HEAD --reset-author])
+  run("./bin/test", release.tag_name)
+  run("rake release")
+end

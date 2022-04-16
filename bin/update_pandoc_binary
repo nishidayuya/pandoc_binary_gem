@@ -1,0 +1,40 @@
+#!/usr/bin/env ruby
+
+USAGE = <<EOS
+Usage: #{File.basename(Process.argv0)} pandoc_version
+EOS
+
+version = ARGV.shift
+if !version
+  $stderr.puts(USAGE)
+  exit(1)
+end
+
+require "zlib"
+
+require "pandoc_binary"
+
+release = PandocBinary::Release.fetch_by_version(version)
+PandocBinary::ARCHITECTURES.each do |architecture|
+  next if architecture.name == "linux-arm64" && Gem::Version.create(version) < "2.12"
+
+  output_path = PandocBinary.gzipped_executable_path(architecture: architecture)
+  asset = release.asset_by_architecture(architecture)
+  architecture.fetch_executable(version: version, asset: asset) do |f_executable|
+    Zlib::GzipWriter.open(output_path, Zlib::BEST_COMPRESSION) do |gzip|
+      gzip.mtime = asset.updated_at_time.tv_sec
+      IO.copy_stream(f_executable, gzip)
+    end
+  end
+end
+
+replace_pattern = {
+  version: version,
+}
+lib_path = PandocBinary::TOP_PATH / "lib"
+lib_path.glob("**/*.template") do |template_path|
+  output_path = template_path.sub_ext("")
+  output_path.write(template_path.read % replace_pattern)
+end
+
+system("bundle", exception: true)
