@@ -17,7 +17,9 @@ raw_releases = JSON.parse(json, symbolize_names: true)
 releases = raw_releases.map { |raw_release|
   PandocBinary::Release.from_raw_data(raw_release)
 }
-sorted_releases = releases.sort_by { |release|
+sorted_releases = releases.select { |release|
+  release.tag_name != "2.10" # yanked version (...misstake and cannot retry...)
+}.sort_by { |release|
   Gem::Version.create(release.tag_name)
 }
 
