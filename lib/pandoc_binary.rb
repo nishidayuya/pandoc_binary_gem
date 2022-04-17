@@ -33,6 +33,8 @@ module PandocBinary
   class Architecture < Struct.new(:name, :archive_suffix, :bin_path, :bin_suffix, keyword_init: true)
     def fetch_executable(version:, asset:)
       bin_path_in_archive = Pathname("#{PREFIX}-#{version}") / bin_path
+      # super special case
+      bin_path_in_archive = Pathname("pandoc-2.12/usr/bin/pandoc") if version == "2.12" && name == "linux-arm64"
       Open3.pipeline_r(
         [*%w[curl --silent --location], asset.browser_download_url],
         [*%w[bsdtar --to-stdout -xf -], bin_path_in_archive.to_s],
