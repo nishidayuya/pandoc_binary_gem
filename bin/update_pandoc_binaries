@@ -31,5 +31,4 @@ sorted_releases.each do |release|
   run("faketime", commit_time.iso8601,
       *%w[git commit --amend -C HEAD --reset-author])
   run("./bin/test", release.tag_name)
-  run("rake release")
 end
