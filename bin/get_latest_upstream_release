@@ -1,0 +1,9 @@
+#!/bin/sh
+
+set -eu
+
+uri=https://api.github.com/repos/jgm/pandoc/releases
+
+curl --silent "$uri" |
+  jq '.[].tag_name' |
+  sed -n -e 's|"||g' -e '1 p'
