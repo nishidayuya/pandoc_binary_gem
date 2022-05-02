@@ -1,0 +1,61 @@
+name: create_tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: target version
+        type: string
+        required: false
+        default: latest
+
+jobs:
+  build:
+    name: Build + Create tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ruby-3.1
+      - name: Install dependencies
+        run: |
+          set -eux
+          sudo apt-get update
+          sudo apt-get install -y curl jq libarchive-tools
+          bundle
+      - name: Setup Git
+        run: |
+          set -eux
+          git config --global user.name "Yuya Nishida"
+          git config --global user.email "62389+nishidayuya@users.noreply.github.com"
+      - name: Output versions
+        run: |
+          set -eux
+          git --version
+          bsdtar --version
+          curl --version
+          jq --version
+          ruby --version
+          gem --version
+          bundle --version
+          bundle list
+      - name: Run
+        run: |
+          set -eux
+          if test "${VERSION:-latest}" = "latest"
+          then
+            export VERSION="$(bin/get_latest_upstream_release)"
+          fi
+          current_version="$(ruby -r./lib/pandoc_binary/version -e 'puts(PandocBinary::VERSION)')"
+          if test "$VERSION" != "$current_version"
+          then
+            bundle exec ./bin/update_pandoc_binary "$VERSION"
+            git add .
+            git commit -m "feat: automatically update from $current_version to $VERSION"
+            ./bin/test "$VERSION"
+            bundle exec rake release:source_control_push
+          fi
+        env:
+          VERSION: ${{github.event.inputs.version}}
