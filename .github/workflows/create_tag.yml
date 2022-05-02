@@ -8,10 +8,13 @@ on:
         type: string
         required: false
         default: latest
+  push:
+    tags:
+      - 'v*'
 
 jobs:
   build:
-    name: Build + Create tag
+    name: Run
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -41,7 +44,8 @@ jobs:
           gem --version
           bundle --version
           bundle list
-      - name: Run
+      - name: Build + Create tag
+        if: ${{github.event_name != 'push'}}
         run: |
           set -eux
           if test "${VERSION:-latest}" = "latest"
@@ -56,8 +60,19 @@ jobs:
             git commit -m "feat: automatically update from $current_version to $VERSION"
             ./bin/test "$VERSION"
             bundle exec rake release:source_control_push
-            gh workflow run release_gem.yml --ref "v$VERSION"
           fi
         env:
           VERSION: ${{github.event.inputs.version}}
-          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+      - name: Publish to RubyGems
+        run: |
+          set -eux
+          version="$(ruby -r./lib/pandoc_binary/version -e 'puts(PandocBinary::VERSION)')"
+          if gem install -v "$version" pandoc_binary
+          then
+            echo 'Do not run "gem push" because that version is installable.'
+          else
+            gem build *.gemspec
+            gem push *.gem
+          fi
+        env:
+          GEM_HOST_API_KEY: ${{secrets.RUBYGEMS_AUTH_TOKEN}}
