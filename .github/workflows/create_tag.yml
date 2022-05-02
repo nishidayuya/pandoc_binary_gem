@@ -56,6 +56,8 @@ jobs:
             git commit -m "feat: automatically update from $current_version to $VERSION"
             ./bin/test "$VERSION"
             bundle exec rake release:source_control_push
+            gh workflow run release_gem.yml --ref "v$VERSION"
           fi
         env:
           VERSION: ${{github.event.inputs.version}}
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
