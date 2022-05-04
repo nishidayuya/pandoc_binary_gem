@@ -9,7 +9,7 @@ on:
         required: false
         default: latest
   schedule:
-    - cron: "54 5 * * *"
+    - cron: "0 14 * * *" # 23:00+09:00
   push:
     tags:
       - 'v*'
