@@ -8,6 +8,8 @@ on:
         type: string
         required: false
         default: latest
+  schedule:
+    - cron: "54 5 * * *"
   push:
     tags:
       - 'v*'
