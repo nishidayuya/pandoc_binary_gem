@@ -1,3 +1,12 @@
+On libexec/ directory, these files are downloaded from
+https://github.com/jgm/pandoc/releases and gzipped.
+They are licensed under GNU GPLv2 or later:
+https://github.com/jgm/pandoc/blob/master/COPYRIGHT
+
+---
+
+On except libexec/ directory, see below:
+
 Copyright (c) 2022 Yuya.Nishida.
 
 X11 License

@@ -8,6 +8,7 @@ Gem::Specification.new do |spec|
   spec.authors = ["Yuya.Nishida."]
   spec.email = ["yuya@j96.org"]
 
+  spec.licenses = %w[GPL-2.0-or-later X11]
   spec.summary = "Provides binaries for Pandoc"
   spec.description = spec.summary
   spec.homepage = "https://github.com/nishidayuya/pandoc_binary_gem"
