@@ -30,14 +30,15 @@ module PandocBinary
     end
   end
 
-  class Architecture < Struct.new(:name, :archive_suffix, :bin_path, :bin_suffix, keyword_init: true)
-    def fetch_executable(version:, asset:)
-      bin_path_in_archive = Pathname("#{PREFIX}-#{version}") / bin_path
-      # super special case
-      bin_path_in_archive = Pathname("pandoc-2.12/usr/bin/pandoc") if version == "2.12" && name == "linux-arm64"
+  class Architecture < Struct.new(:name, :archive_suffix, :asset_patterns, :bin_path_pattern, :bin_suffix, keyword_init: true)
+    def asset_name_patterns
+      return asset_patterns || [name]
+    end
+
+    def fetch_executable(asset:)
       Open3.pipeline_r(
         [*%w[curl --silent --location], asset.browser_download_url],
-        [*%w[bsdtar --to-stdout -xf -], bin_path_in_archive.to_s],
+        [*%w[bsdtar --to-stdout -xf -], bin_path_pattern],
       ) do |stdout, wait_threads|
         result = yield(stdout)
         process_statuses = wait_threads.map(&:value)
@@ -47,11 +48,22 @@ module PandocBinary
     end
   end
 
+  # The top directory of an archive is named after its asset, so it differs
+  # between architectures and versions. Match it with a wildcard instead of
+  # spelling it out.
   ARCHITECTURES = [
-    Architecture.new(name: "linux-amd64", archive_suffix: "tar.gz", bin_path: "bin/pandoc"),
-    Architecture.new(name: "linux-arm64", archive_suffix: "tar.gz", bin_path: "bin/pandoc"),
-    Architecture.new(name: "macOS", archive_suffix: "zip", bin_path: "bin/pandoc"),
-    Architecture.new(name: "windows-x86_64", archive_suffix: "zip", bin_path: "pandoc.exe", bin_suffix: "exe"),
+    Architecture.new(name: "linux-amd64", archive_suffix: "tar.gz",
+                     bin_path_pattern: "*/bin/pandoc"),
+    Architecture.new(name: "linux-arm64", archive_suffix: "tar.gz",
+                     bin_path_pattern: "*/bin/pandoc"),
+    # Pandoc splits its macOS asset into arm64 and x86_64 since 3.1.2. Keep
+    # taking the x86_64 one that runs on both Intel and Apple silicon Macs, and
+    # fall back to the single macOS asset of 3.1.1 and older.
+    Architecture.new(name: "macOS", archive_suffix: "zip",
+                     asset_patterns: %w[x86_64-macOS macOS],
+                     bin_path_pattern: "*/bin/pandoc"),
+    Architecture.new(name: "windows-x86_64", archive_suffix: "zip",
+                     bin_path_pattern: "*/pandoc.exe", bin_suffix: "exe"),
   ]
 
   class Release < Struct.new(:assets, :tag_name, :published_at, keyword_init: true)
@@ -88,10 +100,14 @@ module PandocBinary
     end
 
     def asset_by_architecture(architecture)
-      return assets.find { |asset|
-        asset.name.end_with?(architecture.archive_suffix) &&
-          asset.name.index(architecture.name)
-      }
+      architecture.asset_name_patterns.each do |pattern|
+        asset = assets.find { |asset|
+          asset.name.end_with?(architecture.archive_suffix) &&
+            asset.name.include?(pattern)
+        }
+        return asset if asset
+      end
+      return nil
     end
   end
 
