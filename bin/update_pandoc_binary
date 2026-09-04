@@ -20,7 +20,8 @@ PandocBinary::ARCHITECTURES.each do |architecture|
 
   output_path = PandocBinary.gzipped_executable_path(architecture: architecture)
   asset = release.asset_by_architecture(architecture)
-  architecture.fetch_executable(version: version, asset: asset) do |f_executable|
+  raise "asset is not found: version=#{version} architecture=#{architecture.name}" if !asset
+  architecture.fetch_executable(asset: asset) do |f_executable|
     Zlib::GzipWriter.open(output_path, Zlib::BEST_COMPRESSION) do |gzip|
       gzip.mtime = asset.updated_at_time.tv_sec
       IO.copy_stream(f_executable, gzip)
