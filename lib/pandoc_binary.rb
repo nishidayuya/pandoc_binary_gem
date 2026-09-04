@@ -5,6 +5,7 @@ require "net/http"
 require "open3"
 require "pathname"
 require "rbconfig"
+require "tempfile"
 require "time"
 require "uri"
 require "zlib"
@@ -35,15 +36,24 @@ module PandocBinary
       return asset_patterns || [name]
     end
 
+    # Spool the executable to a temporary file instead of yielding the pipeline
+    # itself. Zlib releases the GVL while deflating, and a SIGCHLD from the
+    # exiting pipeline processes makes that deflate fail with Zlib::BufError on
+    # some Ruby versions. Handing over a file keeps the caller's work away from
+    # any child process.
     def fetch_executable(asset:)
-      Open3.pipeline_r(
-        [*%w[curl --silent --location], asset.browser_download_url],
-        [*%w[bsdtar --to-stdout -xf -], bin_path_pattern],
-      ) do |stdout, wait_threads|
-        result = yield(stdout)
-        process_statuses = wait_threads.map(&:value)
-        raise "Command failed with exit: statuses=#{process_statuses.inspect}" if !process_statuses.all?(&:success?)
-        return result
+      Tempfile.create(["#{PREFIX}-#{name}", ".bin"]) do |f_executable|
+        f_executable.binmode
+        Open3.pipeline_r(
+          [*%w[curl --silent --location], asset.browser_download_url],
+          [*%w[bsdtar --to-stdout -xf -], bin_path_pattern],
+        ) do |stdout, wait_threads|
+          IO.copy_stream(stdout, f_executable)
+          process_statuses = wait_threads.map(&:value)
+          raise "Command failed with exit: statuses=#{process_statuses.inspect}" if !process_statuses.all?(&:success?)
+        end
+        f_executable.rewind
+        return yield(f_executable)
       end
     end
   end
