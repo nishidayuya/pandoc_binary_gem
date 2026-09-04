@@ -1,0 +1,36 @@
+name: test
+
+on:
+  pull_request:
+
+jobs:
+  test:
+    name: Run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ruby-3.1
+      - name: Install dependencies
+        run: |
+          set -eux
+          sudo apt-get update
+          sudo apt-get install -y curl libarchive-tools
+          bundle
+      - name: Output versions
+        run: |
+          set -eux
+          git --version
+          bsdtar --version
+          curl --version
+          ruby --version
+          gem --version
+          bundle --version
+          bundle list
+      - name: Test
+        run: |
+          set -eux
+          current_version="$(ruby -r./lib/pandoc_binary/version -e 'puts(PandocBinary::VERSION)')"
+          ./bin/test "$current_version"
