@@ -46,3 +46,5 @@ jobs:
           set -eux
           current_version="$(ruby -r./lib/pandoc_binary/version -e 'puts(PandocBinary::VERSION)')"
           ./bin/test "$current_version"
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}

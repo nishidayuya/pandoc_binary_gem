@@ -85,6 +85,7 @@ module PandocBinary
       include RawDataParsable
 
       URI_BASE = "https://api.github.com/repos/jgm/pandoc/releases/tags/%{version}"
+      TOKEN_ENV_NAMES = %w[GITHUB_TOKEN GH_TOKEN]
 
       def from_raw_data(raw_data)
         result = super
@@ -94,10 +95,24 @@ module PandocBinary
         return result
       end
 
+      # Unauthenticated GitHub API requests are limited to 60 per hour per IP,
+      # which a CI matrix sharing a runner IP exhausts easily. Send a token when
+      # the environment has one.
+      def request_headers
+        token = TOKEN_ENV_NAMES.lazy.filter_map { |name| ENV[name] }.reject(&:empty?).first
+        return {
+          "Accept" => "application/vnd.github+json",
+          **(token ? {"Authorization" => "Bearer #{token}"} : {}),
+        }
+      end
+
       def fetch_by_version(version)
         uri = URI(URI_BASE % {version: version})
-        json = Net::HTTP.get(uri)
+        json = Net::HTTP.get(uri, request_headers)
         raw_release = JSON.parse(json, symbolize_names: true)
+        # An error response also parses as JSON, so report its message instead
+        # of failing later on a missing key.
+        raise "Failed to fetch release: version=#{version} response=#{raw_release.inspect}" if !raw_release[:assets]
         return from_raw_data(raw_release)
       end
     end
