@@ -101,11 +101,10 @@ module PandocBinary
 
     def asset_by_architecture(architecture)
       architecture.asset_name_patterns.each do |pattern|
-        asset = assets.find { |asset|
-          asset.name.end_with?(architecture.archive_suffix) &&
+        assets.each do |asset|
+          return asset if asset.name.end_with?(architecture.archive_suffix) &&
             asset.name.include?(pattern)
-        }
-        return asset if asset
+        end
       end
       return nil
     end
