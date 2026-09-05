@@ -4,6 +4,26 @@ set -eu
 
 uri=https://api.github.com/repos/jgm/pandoc/releases
 
-curl --silent "$uri" |
-  jq '.[].tag_name' |
-  sed -n -e 's|"||g' -e '1 p'
+# Draft and prerelease releases, and releases whose assets are not uploaded
+# yet, are not usable for this gem. Some of them even have no tag, so
+# "releases/tags/<tag_name>" returns 404 for them. Pick the latest usable one.
+version="$(
+  curl --silent "$uri" |
+    jq --raw-output '
+      [
+        .[] |
+        select(.draft == false and .prerelease == false) |
+        select((.assets | length) > 0)
+      ] |
+      first |
+      .tag_name
+    '
+)"
+
+if test -z "$version" || test "$version" = null
+then
+  echo "usable release is not found: uri=$uri" >&2
+  exit 1
+fi
+
+echo "$version"
