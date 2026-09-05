@@ -86,8 +86,9 @@ module PandocBinary
 
       def fetch_by_version(version)
         uri = URI(URI_BASE % {version: version})
-        json = Net::HTTP.get(uri)
-        raw_release = JSON.parse(json, symbolize_names: true)
+        response = Net::HTTP.get_response(uri)
+        raise "Failed to fetch release: version=#{version} uri=#{uri} status=#{response.code} #{response.message}" if !response.is_a?(Net::HTTPSuccess)
+        raw_release = JSON.parse(response.body, symbolize_names: true)
         return from_raw_data(raw_release)
       end
     end
