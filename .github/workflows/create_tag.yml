@@ -46,7 +46,11 @@ jobs:
           gem --version
           bundle --version
           bundle list
+      # A tag push means the build already happened in the run that created the
+      # tag. Building again would update to the latest version and try to
+      # re-create its existing tag, so only publish in that case.
       - name: Build + Create tag
+        if: github.event_name != 'push'
         run: |
           set -eux
           if test "${VERSION:-latest}" = "latest"
