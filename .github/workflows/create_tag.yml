@@ -27,7 +27,10 @@ jobs:
       - name: Install dependencies
         run: |
           set -eux
-          sudo apt-get update
+          # A third-party apt repository of the runner image serving a broken
+          # index must not stop a release, so ignore a failing update and let
+          # installing the packages we need be the check.
+          sudo apt-get update || true
           sudo apt-get install -y curl jq libarchive-tools
           bundle
       - name: Setup Git
