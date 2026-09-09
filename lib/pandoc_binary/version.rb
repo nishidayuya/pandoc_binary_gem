@@ -2,5 +2,5 @@
 # frozen_string_literal: true
 
 module PandocBinary
-  VERSION = "3.4"
+  VERSION = "3.5"
 end
