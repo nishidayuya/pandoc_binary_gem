@@ -68,6 +68,7 @@ jobs:
           fi
         env:
           VERSION: ${{github.event.inputs.version}}
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Publish to RubyGems
         run: |
           set -eux
