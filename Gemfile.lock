@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    pandoc_binary (3.3)
+    pandoc_binary (3.4)
 
 GEM
   remote: https://rubygems.org/
