@@ -5,6 +5,7 @@ require "net/http"
 require "open3"
 require "pathname"
 require "rbconfig"
+require "tempfile"
 require "time"
 require "uri"
 require "zlib"
@@ -35,15 +36,24 @@ module PandocBinary
       return asset_patterns || [name]
     end
 
+    # Spool the executable to a temporary file instead of yielding the pipeline
+    # itself. Zlib releases the GVL while deflating, and a SIGCHLD from the
+    # exiting pipeline processes makes that deflate fail with Zlib::BufError on
+    # some Ruby versions. Handing over a file keeps the caller's work away from
+    # any child process.
     def fetch_executable(asset:)
-      Open3.pipeline_r(
-        [*%w[curl --silent --location], asset.browser_download_url],
-        [*%w[bsdtar --to-stdout -xf -], bin_path_pattern],
-      ) do |stdout, wait_threads|
-        result = yield(stdout)
-        process_statuses = wait_threads.map(&:value)
-        raise "Command failed with exit: statuses=#{process_statuses.inspect}" if !process_statuses.all?(&:success?)
-        return result
+      Tempfile.create(["#{PREFIX}-#{name}", ".bin"]) do |f_executable|
+        f_executable.binmode
+        Open3.pipeline_r(
+          [*%w[curl --silent --location], asset.browser_download_url],
+          [*%w[bsdtar --to-stdout -xf -], bin_path_pattern],
+        ) do |stdout, wait_threads|
+          IO.copy_stream(stdout, f_executable)
+          process_statuses = wait_threads.map(&:value)
+          raise "Command failed with exit: statuses=#{process_statuses.inspect}" if !process_statuses.all?(&:success?)
+        end
+        f_executable.rewind
+        return yield(f_executable)
       end
     end
   end
@@ -75,6 +85,7 @@ module PandocBinary
       include RawDataParsable
 
       URI_BASE = "https://api.github.com/repos/jgm/pandoc/releases/tags/%{version}"
+      TOKEN_ENV_NAMES = %w[GITHUB_TOKEN GH_TOKEN]
 
       def from_raw_data(raw_data)
         result = super
@@ -84,10 +95,24 @@ module PandocBinary
         return result
       end
 
+      # Unauthenticated GitHub API requests are limited to 60 per hour per IP,
+      # which a CI matrix sharing a runner IP exhausts easily. Send a token when
+      # the environment has one.
+      def request_headers
+        token = TOKEN_ENV_NAMES.lazy.filter_map { |name| ENV[name] }.reject(&:empty?).first
+        return {
+          "Accept" => "application/vnd.github+json",
+          **(token ? {"Authorization" => "Bearer #{token}"} : {}),
+        }
+      end
+
       def fetch_by_version(version)
         uri = URI(URI_BASE % {version: version})
-        json = Net::HTTP.get(uri)
+        json = Net::HTTP.get(uri, request_headers)
         raw_release = JSON.parse(json, symbolize_names: true)
+        # An error response also parses as JSON, so report its message instead
+        # of failing later on a missing key.
+        raise "Failed to fetch release: version=#{version} response=#{raw_release.inspect}" if !raw_release[:assets]
         return from_raw_data(raw_release)
       end
     end
